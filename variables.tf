@@ -3,6 +3,11 @@ variable "name" {
   type        = string
 }
 
+variable "AWS_REGION" {
+  description = "Aws region server"
+  default     = "eu-west-1"
+}
+
 variable "AMI" {
   description = "The AMI that created in the ec2"
   type        = map(string)
@@ -35,7 +40,7 @@ variable "public_subnets_cidr_block" {
 
 variable "security_access" {
   description = "CIDR block of the security groups"
-  type        = list(string)
+  type        = list(any)
 }
 
 variable "key_pair_name" {
