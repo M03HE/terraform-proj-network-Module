@@ -75,3 +75,138 @@ resource "aws_security_group" "ssh-allowed" {
     Name = "ssh-allowed"
   }
 }
+
+###EC2
+resource "tls_private_key" "demo_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "generated_key" {
+  key_name   = var.key_pair_name
+  public_key = tls_private_key.demo_key.public_key_openssh
+}
+
+resource "local_file" "ssh_key" {
+  filename        = "${local.key_name}.pem"
+  content         = tls_private_key.demo_key.private_key_pem
+  file_permission = "0400"
+}
+
+resource "aws_instance" "web1" {
+  ami                         = lookup(var.AMI, var.AWS_REGION)
+  subnet_id                   = aws_subnet.prod-subnet-public-1.id
+  instance_type               = var.ec2_instance_type
+  associate_public_ip_address = true
+  key_name                    = local.key_name
+  vpc_security_group_ids      = [aws_security_group.ssh-allowed.id]
+
+  provisioner "remote-exec" {
+    inline = ["echo 'Wait untill SSH is ready'"]
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      private_key = local_file.ssh_key.content
+      host        = self.public_ip
+    }
+  }
+  provisioner "local-exec" {
+    command = "ansible-playbook -i ${self.public_ip}, --private-key ${local.private_key_path} jenkins.yaml"
+  }
+}
+
+output "jenkins_ip" {
+  value = aws_instance.web1.public_ip
+}
+
+###EVENTBRIDGE
+resource "aws_scheduler_schedule" "start-instances-schedule" {
+  name       = "start-instances-schedule"
+  group_name = "default"
+  flexible_time_window {
+    mode = "OFF"
+  }
+  schedule_expression = local.time_instance_start
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
+    role_arn = aws_iam_role.schedule.arn
+
+    input = jsonencode({
+      "InstanceIds" : [
+        aws_instance.web1.id
+      ]
+      }
+    )
+  }
+}
+
+resource "aws_scheduler_schedule" "stop-instances-schedule" {
+  name       = "stop-instances-schedule"
+  group_name = "default"
+  flexible_time_window {
+    mode = "OFF"
+  }
+  schedule_expression = local.time_instance_stop
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
+    role_arn = aws_iam_role.schedule.arn
+
+    input = jsonencode({
+      "InstanceIds" : [
+        aws_instance.web1.id
+      ]
+      }
+    )
+  }
+}
+
+###SNS
+resource "aws_cloudwatch_event_rule" "ec2-alert" {
+  name        = "capture-aws-ec2"
+  description = "Capture each AWS ec2 stop and running"
+
+  event_pattern = jsonencode({
+    "source" : ["aws.ec2"],
+    "detail-type" : ["EC2 Instance State-change Notification"],
+    "detail" : {
+      "state" : ["stopped", "running"]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "sns" {
+  rule      = aws_cloudwatch_event_rule.ec2-alert.name
+  target_id = "SendToSNS"
+  arn       = aws_sns_topic.aws_logins.arn
+}
+
+resource "aws_sns_topic" "aws_logins" {
+  name = "aws-console-logins"
+}
+
+resource "aws_sns_topic_policy" "default" {
+  arn    = aws_sns_topic.aws_logins.arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
+resource "aws_sns_topic_subscription" "email-target" {
+  topic_arn = aws_sns_topic.aws_logins.arn
+  protocol  = "email"
+  endpoint  = local.email_usr
+}
+
+data "aws_iam_policy_document" "sns_topic_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.aws_logins.arn]
+  }
+}
+
+

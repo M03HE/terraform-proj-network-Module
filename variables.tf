@@ -43,3 +43,16 @@ variable "key_pair_name" {
   type        = string
   default     = "devops"
 }
+
+variable "time_instance_stop" {
+  description = "The time when the instance is stopped"
+  type        = string
+}
+variable "time_instance_start" {
+  description = "The Time when the instance is started"
+  type        = string
+}
+variable "email_usr" {
+  description = "The Email of User"
+  type        = string
+}
