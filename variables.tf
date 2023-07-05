@@ -35,7 +35,7 @@ variable "public_subnets_cidr_block" {
 
 variable "security_access" {
   description = "CIDR block of the security groups"
-  type        = string
+  type        = list(string)
 }
 
 variable "key_pair_name" {
