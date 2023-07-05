@@ -30,7 +30,7 @@ resource "aws_route_table" "prod-public-rt" {
   vpc_id = aws_vpc.prod-vpc.id
   route {
     //associated subnet can reach everywhere
-    cidr_block = local.cidr_block
+    cidr_block = "0.0.0.0/0"
     //rt uses this IGW to reach the internet 
     gateway_id = aws_internet_gateway.prod-igw.id
   }
