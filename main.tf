@@ -245,6 +245,18 @@ resource "aws_iam_role_policy" "stop-start-instance" {
   })
 }
 
+###ROUTE 53
+resource "aws_route53_zone" "hosted_zone" {
+  name = "moshe.one"
+}
+resource "aws_route53_record" "www" {
+  depends_on = [aws_instance.web1]
+  zone_id    = aws_route53_zone.hosted_zone.zone_id
+  name       = "www"
+  type       = "A"
+  ttl        = 300
+  records    = [aws_instance.web1.public_ip]
+}
 
 
 
