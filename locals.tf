@@ -10,5 +10,5 @@ locals {
   time_instance_stop  = var.time_instance_stop
   time_instance_start = var.time_instance_start
   ###SNS
-  email_usr   = var.email_usr
+  email_usr    = var.email_usr
 }

@@ -93,7 +93,7 @@ resource "local_file" "ssh_key" {
   file_permission = "0400"
 }
 
-resource "aws_instance" "web1" {
+resource "aws_instance" "instance" {
   ami                         = lookup(var.AMI, var.AWS_REGION)
   subnet_id                   = aws_subnet.prod-subnet-public-1.id
   instance_type               = var.ec2_instance_type
@@ -129,7 +129,7 @@ resource "aws_scheduler_schedule" "start-instances-schedule" {
 
     input = jsonencode({
       "InstanceIds" : [
-        aws_instance.web1.id
+        aws_instance.instance.id
       ]
       }
     )
@@ -149,7 +149,7 @@ resource "aws_scheduler_schedule" "stop-instances-schedule" {
 
     input = jsonencode({
       "InstanceIds" : [
-        aws_instance.web1.id
+        aws_instance.instance.id
       ]
       }
     )
@@ -250,12 +250,12 @@ resource "aws_route53_zone" "hosted_zone" {
   name = "moshe.one"
 }
 resource "aws_route53_record" "www" {
-  depends_on = [aws_instance.web1]
+  depends_on = [aws_instance.instance]
   zone_id    = aws_route53_zone.hosted_zone.zone_id
   name       = "www"
   type       = "A"
   ttl        = 300
-  records    = [aws_instance.web1.public_ip]
+  records    = [aws_instance.instance.public_ip]
 }
 
 
